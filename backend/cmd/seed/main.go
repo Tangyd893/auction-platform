@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/lib/pq"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
 	// 创建默认管理员用户
-	dsn := "host=localhost port=5432 user=postgres password=postgres123 dbname=auction sslmode=disable"
+	dsn := "host=localhost port=5432 user=postgres password=postgres dbname=auction sslmode=disable"
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
 		fmt.Println("Failed to connect to database:", err)

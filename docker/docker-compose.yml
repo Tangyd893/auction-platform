@@ -1,17 +1,15 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     container_name: auction_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: auction
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - auction_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -29,15 +27,13 @@ services:
       timeout: 5s
       retries: 5
 
-  envoy:
-    image: envoyproxy/envoy:v1.29
-    container_name: auction_envoy
-    ports:
-      - "8081:8081"
-    volumes:
-      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+  # Envoy (gRPC-Web proxy) 需要手动单独启动:
+  #   docker run -d --name auction_envoy \
+  #     -p 8081:8081 \
+  #     -v $(pwd)/envoy.yaml:/etc/envoy/envoy.yaml:ro \
+  #     --add-host=host.docker.internal:host-gateway \
+  #     envoyproxy/envoy:v1.29
+  # 如无网络拉取镜像，可注释此服务，前端 gRPC-Web 功能不可用，HTTP REST API 正常
 
 volumes:
-  postgres_data:
+  auction_postgres_data:

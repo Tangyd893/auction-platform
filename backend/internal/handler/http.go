@@ -3,8 +3,10 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"auction-platform/internal/service"
 )
@@ -189,7 +191,7 @@ func (h *Handler) PlaceBid(c *gin.Context) {
 }
 
 func (h *Handler) GetBids(c *gin.Context) {
-	itemID, err := strconv.ParseInt(c.Param("itemId"), 10, 64)
+	itemID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid item id"})
 		return
@@ -286,7 +288,24 @@ func (h *Handler) UpdateOrderStatus(c *gin.Context) {
 // ============ Helper ============
 
 func (h *Handler) getUserID(c *gin.Context) int64 {
-	// 从 context 中的 token 解析（简化实现）
-	// 实际应从 JWT middleware 注入
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return 1 // 测试用，未登录默认用户1
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// 解析 JWT（不验证签名，仅提取 userID）
+	// 生产环境应验证签名
+	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return 1
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if userID, ok := claims["user_id"].(float64); ok {
+			return int64(userID)
+		}
+	}
 	return 1
 }

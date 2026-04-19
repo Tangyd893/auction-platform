@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"auction-platform/internal/config"
+	"auction-platform/internal/handler"
 	"auction-platform/internal/interceptor"
 	"auction-platform/internal/repository"
 	"auction-platform/internal/service"
@@ -90,12 +92,9 @@ func main() {
 	reflection.Register(grpcServer)
 
 	// 启动 HTTP 服务器（用于 HTTP REST API + Prometheus metrics）
-	mux := http.NewServeMux()
-	setupHTTPRoutes(mux, grpcServer, authService)
-
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port),
-		Handler: mux,
+		Handler: setupHTTPRoutes(grpcServer, authService, itemService, bidService, orderService, userService),
 	}
 
 	// 启动 gRPC
@@ -146,13 +145,49 @@ func main() {
 	log.Info().Msg("Server exited")
 }
 
-func setupHTTPRoutes(mux *http.ServeMux, grpcServer *grpc.Server, authService *service.AuthService) {
+func setupHTTPRoutes(
+	grpcServer *grpc.Server,
+	authService *service.AuthService,
+	itemService *service.ItemService,
+	bidService *service.BidService,
+	orderService *service.OrderService,
+	userService *service.UserService,
+) http.Handler {
+	router := gin.Default()
+
+	h := handler.NewHandler(authService, itemService, bidService, orderService, userService)
+
 	// 健康检查
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// gRPC Gateway 可以在这里接入，或使用 grpcweb
-	// 目前先用 HTTP handler 直接处理
+	api := router.Group("/api")
+	{
+		// 认证
+		api.POST("/auth/register", h.Register)
+		api.POST("/auth/login", h.Login)
+
+		// 拍品
+		api.POST("/items", h.CreateItem)
+		api.GET("/items", h.ListItems)
+		api.GET("/items/:id", h.GetItem)
+		api.DELETE("/items/:id", h.CancelItem)
+
+		// 我的物品
+		api.GET("/my-items", h.ListMyItems)
+
+		// 出价
+		api.POST("/bids", h.PlaceBid)
+		api.GET("/items/:id/bids", h.GetBids)
+		api.GET("/my-bids", h.GetMyBids)
+
+		// 订单
+		api.POST("/orders", h.CreateOrder)
+		api.GET("/orders", h.ListOrders)
+		api.GET("/orders/:id", h.GetOrder)
+		api.PUT("/orders/:id/status", h.UpdateOrderStatus)
+	}
+
+	return router
 }

@@ -1,6 +1,6 @@
 import { grpc } from '@improbable-eng/grpc-web'
-import * as proto from './proto/auction_pb'
-import * as svc from './proto/auction_grpc_web_pb'
+import * as proto from '@improbable-eng/grpc-web/proto/auction_pb'
+import * as svc from '@improbable-eng/grpc-web/proto/auction_grpc_web_pb'
 
 // gRPC-Web endpoint (via Envoy proxy)
 const GRPC_ENDPOINT = 'http://localhost:8081'
