@@ -6,23 +6,22 @@ import (
 	"time"
 
 	"auction-platform/internal/model"
-	"auction-platform/internal/repository"
 )
 
 var (
 	ErrBidTooLow      = errors.New("bid amount is too low")
 	ErrAuctionEnded    = errors.New("auction has ended")
-	ErrCannotBidOwn    = errors.New("cannot bid on your own item")
-	ErrItemNotActive   = errors.New("item is not available for bidding")
+	ErrCannotBidOwn   = errors.New("cannot bid on your own item")
+	ErrItemNotActive  = errors.New("item is not available for bidding")
 )
 
 type BidService struct {
-	bidRepo  *repository.BidRepository
-	itemRepo *repository.ItemRepository
-	cache    *repository.CacheRepository
+	bidRepo  BidRepo
+	itemRepo ItemRepo
+	cache    CacheRepo
 }
 
-func NewBidService(bidRepo *repository.BidRepository, itemRepo *repository.ItemRepository, cache *repository.CacheRepository) *BidService {
+func NewBidService(bidRepo BidRepo, itemRepo ItemRepo, cache CacheRepo) *BidService {
 	return &BidService{bidRepo: bidRepo, itemRepo: itemRepo, cache: cache}
 }
 

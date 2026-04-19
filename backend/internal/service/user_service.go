@@ -4,14 +4,13 @@ import (
 	"context"
 
 	"auction-platform/internal/model"
-	"auction-platform/internal/repository"
 )
 
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo UserRepo
 }
 
-func NewUserService(userRepo *repository.UserRepository) *UserService {
+func NewUserService(userRepo UserRepo) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 

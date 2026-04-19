@@ -9,21 +9,20 @@ import (
 
 	"auction-platform/internal/config"
 	"auction-platform/internal/model"
-	"auction-platform/internal/repository"
 )
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserExists         = errors.New("user already exists")
-	ErrInvalidToken       = errors.New("invalid token")
+	ErrUserExists       = errors.New("user already exists")
+	ErrInvalidToken     = errors.New("invalid token")
 )
 
 type AuthService struct {
-	userRepo *repository.UserRepository
+	userRepo UserRepo
 	jwtCfg   *config.JWTConfig
 }
 
-func NewAuthService(userRepo *repository.UserRepository, jwtCfg *config.JWTConfig) *AuthService {
+func NewAuthService(userRepo UserRepo, jwtCfg *config.JWTConfig) *AuthService {
 	return &AuthService{
 		userRepo: userRepo,
 		jwtCfg:   jwtCfg,

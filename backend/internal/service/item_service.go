@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"auction-platform/internal/model"
-	"auction-platform/internal/repository"
 )
 
 var (
@@ -15,11 +14,11 @@ var (
 )
 
 type ItemService struct {
-	itemRepo *repository.ItemRepository
-	cache    *repository.CacheRepository
+	itemRepo ItemRepo
+	cache    CacheRepo
 }
 
-func NewItemService(itemRepo *repository.ItemRepository, cache *repository.CacheRepository) *ItemService {
+func NewItemService(itemRepo ItemRepo, cache CacheRepo) *ItemService {
 	return &ItemService{itemRepo: itemRepo, cache: cache}
 }
 

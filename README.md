@@ -9,7 +9,7 @@
 | 层级 | 技术 |
 |------|------|
 | RPC 框架 | google.golang.org/grpc v1.62 |
-| HTTP 框架 | github.com/gin-gonic/gin |
+| HTTP 框架 | github.com/gin-gonic/gin v1.9.1 |
 | 数据库 | PostgreSQL 16 |
 | 缓存 | Redis 7 |
 | 数据层 | github.com/jmoiron/sqlx |
@@ -17,6 +17,7 @@
 | 日志 | github.com/rs/zerolog |
 | 指标 | github.com/prometheus/client_golang |
 | 认证 | github.com/golang-jwt/jwt/v5 |
+| 测试 | github.com/stretchr/testify |
 
 ### 前端 (React)
 
@@ -31,15 +32,15 @@
 
 ```
 AuctionService (gRPC)
-├── Register/Login             (Unary)          用户注册/登录
-├── CreateItem                 (Unary)          创建拍品
-├── GetItem/ListItems          (Unary)          查询拍品
-├── PlaceBid                   (Unary)          出价
-├── PlaceBidBatch              (Client Streaming) 批量出价
+├── Register/Login             (Unary)            用户注册/登录
+├── CreateItem                 (Unary)            创建拍品
+├── GetItem/ListItems          (Unary)            查询拍品
+├── PlaceBid                   (Unary)            出价
+├── PlaceBidBatch              (Client Streaming)  批量出价
 ├── StreamBids                 (Server Streaming) 订阅出价更新
-├── BidirectionalBid           (Bidirectional)    实时竞价窗口
-├── StreamAuction              (Server Streaming) 拍卖大厅
-└── CreateOrder/GetOrder       (Unary)          订单管理
+├── BidirectionalBid            (Bidirectional)     实时竞价窗口
+├── StreamAuction               (Server Streaming) 拍卖大厅
+└── CreateOrder/GetOrder      (Unary)            订单管理
 ```
 
 ## 快速开始
@@ -47,12 +48,13 @@ AuctionService (gRPC)
 ### 前置依赖
 
 ```bash
-# 安装 protoc (Linux)
-curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip
-sudo unzip -o protoc-25.1-linux-x86_64.zip -d /usr/local
+# Go 1.21+
+go version
 
-# 安装 Go protobuf 插件
-export PATH=$PATH:/usr/local/go/bin:~/go/bin
+# protoc 25.1+
+protoc --version
+
+# Go protobuf 插件
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0
 ```
@@ -67,7 +69,7 @@ docker compose up -d
 ### 2. 初始化数据库
 
 ```bash
-# 创建默认管理员账号
+# 创建默认管理员账号（用户名: admin / 密码: admin123）
 cd ../backend
 go run cmd/seed/main.go
 ```
@@ -107,27 +109,30 @@ npm run dev
 ```
 auction-platform/
 ├── proto/
-│   ├── auction.proto            # Proto 定义文件
-│   └── gen/auction/            # 生成的 Go 代码
+│   ├── auction.proto              # Proto 定义文件
+│   └── gen/auction/             # 生成的 Go 代码
 ├── backend/
 │   ├── cmd/
-│   │   ├── server/             # 主服务入口
-│   │   └── seed/               # 数据库初始化
+│   │   ├── server/              # 主服务入口
+│   │   └── seed/                # 数据库初始化
 │   ├── internal/
-│   │   ├── config/             # Viper 配置
+│   │   ├── config/              # Viper 配置加载
+│   │   ├── handler/             # HTTP Handler (Gin)
+│   │   ├── interceptor/          # gRPC 拦截器
 │   │   ├── model/              # 数据模型
 │   │   ├── repository/          # PostgreSQL + Redis 操作
-│   │   ├── service/            # 业务逻辑
-│   │   └── interceptor/         # gRPC 拦截器
-│   ├── proto/gen/auction/      # 生成的 proto 代码
+│   │   └── service/            # 业务逻辑层
+│   │       ├── tests/          # 单元测试
+│   │       └── *_test.go       # 集成测试
 │   └── config.yaml
 ├── frontend/
 │   └── src/
-│       ├── pages/              # 页面组件
-│       ├── components/          # 公共组件
-│       ├── stores/             # Zustand 状态
-│       └── lib/                # API 封装
-├── docker/                     # Docker Compose
+│       ├── pages/               # 页面组件
+│       ├── components/           # 公共组件
+│       ├── stores/              # Zustand 状态
+│       └── lib/                 # API 封装
+├── docker/
+│   └── docker-compose.yml
 └── Makefile
 ```
 
@@ -136,13 +141,66 @@ auction-platform/
 ```bash
 make docker-start    # 启动 Docker 基础设施
 make docker-stop     # 停止 Docker
-make proto           # 生成 proto 代码
-make backend-deps    # 下载 Go 依赖
+make proto          # 生成 proto 代码
+make backend-deps   # 下载 Go 依赖
 make backend-run     # 启动后端
-make seed            # 初始化管理员账号
+make seed           # 初始化管理员账号
 make frontend-deps   # 安装前端依赖
 make frontend-run    # 启动前端
-make dev             # 一键启动（基础设施+后端+前端）
+make dev            # 一键启动（基础设施+后端+前端）
+make test           # 运行后端测试
+make build          # 编译后端
+```
+
+## 测试
+
+### 后端测试（Go）
+
+```bash
+# 运行所有测试
+go test -v ./...
+
+# 带覆盖率
+go test -v -cover ./...
+
+# 竞态检测
+go test -race -v ./...
+
+# 指定包
+go test -v ./internal/service/...
+```
+
+当前测试状态：**8/8 通过**
+
+```
+=== RUN   TestPlaceBid_Success
+--- PASS: TestPlaceBid_Success (0.00s)
+=== RUN   TestPlaceBid_TooLow
+--- PASS: TestPlaceBid_TooLow (0.00s)
+=== RUN   TestPlaceBid_CannotBidOwnItem
+--- PASS: TestPlaceBid_CannotBidOwnItem (0.00s)
+=== RUN   TestPlaceBid_AuctionEnded
+--- PASS: TestPlaceBid_AuctionEnded (0.00s)
+=== RUN   TestPlaceBid_ItemNotActive
+--- PASS: TestPlaceBid_ItemNotActive (0.00s)
+=== RUN   TestCreateItem_EndTimeInPast
+--- PASS: TestCreateItem_EndTimeInPast (0.00s)
+=== RUN   TestCreateItem_StartAfterEnd
+--- PASS: TestCreateItem_StartAfterEnd (0.00s)
+=== RUN   TestCancelItem_AlreadySold
+--- PASS: TestCancelItem_AlreadySold (0.00s)
+PASS
+```
+
+### gRPC 调试（无需生成客户端）
+
+```bash
+# 启动 reflection
+grpcurl -plaintext localhost:50051 list
+
+# 调用 Login
+grpcurl -plaintext -d '{"username":"admin","password":"admin123"}' \
+  localhost:50051 auction.AuctionService/Login
 ```
 
 ## gRPC 四种 RPC 模式
@@ -162,6 +220,23 @@ make dev             # 一键启动（基础设施+后端+前端）
 - [x] 出价历史记录
 - [x] 成交订单管理
 - [x] Prometheus 指标
+- [x] gRPC 拦截器（日志 + metrics）
+- [x] 单元测试（Service 层，8/8 通过）
+- [ ] HTTP REST API 完整端点
 - [ ] gRPC-Web 前端集成
 - [ ] WebSocket 实时竞价
 - [ ] 支付集成
+
+## 项目完成度
+
+| 模块 | 完成度 |
+|------|--------|
+| Proto 定义 | 100% |
+| 数据库层 | 100% |
+| Repository 层 | 100% |
+| Service 层 | 100% |
+| gRPC Server | 100% |
+| HTTP Handler | 80% |
+| 单元测试 | 100% |
+| 前端页面 | 90% |
+| 前端 API 对接 | 50% |

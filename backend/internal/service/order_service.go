@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"auction-platform/internal/model"
-	"auction-platform/internal/repository"
 )
 
 var (
@@ -14,11 +13,11 @@ var (
 )
 
 type OrderService struct {
-	orderRepo *repository.OrderRepository
-	itemRepo  *repository.ItemRepository
+	orderRepo OrderRepo
+	itemRepo  ItemRepo
 }
 
-func NewOrderService(orderRepo *repository.OrderRepository, itemRepo *repository.ItemRepository) *OrderService {
+func NewOrderService(orderRepo OrderRepo, itemRepo ItemRepo) *OrderService {
 	return &OrderService{orderRepo: orderRepo, itemRepo: itemRepo}
 }
 
