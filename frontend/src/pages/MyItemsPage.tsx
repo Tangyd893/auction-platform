@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { itemApi } from '../lib/api'
+import { itemClient, proto } from '../grpc/client'
 import { useAuthStore } from '../stores/auth'
 import { Plus } from 'lucide-react'
 
@@ -9,19 +9,19 @@ export default function MyItemsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-items'],
-    queryFn: () => itemApi.myItems({ status: '' }),
+    queryFn: () => itemClient.myItems(user?.id || 0),
   })
 
-  const items = data?.data?.items || []
+  const items = data?.items || []
 
   const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
 
-  const statusText: Record<string, string> = {
-    draft: '草稿',
-    listed: '正在拍卖',
-    sold: '已售出',
-    unsold: '流拍',
-    cancelled: '已取消',
+  const statusText: Record<number, string> = {
+    [proto.ItemStatus.DRAFT]: '草稿',
+    [proto.ItemStatus.LISTED]: '正在拍卖',
+    [proto.ItemStatus.SOLD]: '已售出',
+    [proto.ItemStatus.UNSOLD]: '流拍',
+    [proto.ItemStatus.CANCELLED]: '已取消',
   }
 
   return (
@@ -51,42 +51,42 @@ export default function MyItemsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-6">
-          {items.map((item: any) => (
+          {items.map((item: proto.Item) => (
             <div
-              key={item.id}
+              key={item.getId()}
               className="bg-white rounded-xl overflow-hidden shadow-sm"
             >
               <img
-                src={item.imageUrl || 'https://via.placeholder.com/300x200'}
-                alt={item.title}
+                src={item.getImageUrl() || 'https://via.placeholder.com/300x200'}
+                alt={item.getTitle()}
                 className="w-full h-40 object-cover"
               />
               <div className="p-4">
                 <h3 className="font-semibold text-lg mb-2 truncate">
-                  {item.title}
+                  {item.getTitle()}
                 </h3>
                 <div className="space-y-1 text-sm mb-3">
                   <div className="flex justify-between">
                     <span className="text-gray-500">当前价</span>
                     <span className="text-indigo-600 font-bold">
-                      {formatPrice(item.currentPrice)}
+                      {formatPrice(item.getCurrentPrice())}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">状态</span>
                     <span
                       className={
-                        item.status === 'listed'
+                        item.getStatus() === proto.ItemStatus.LISTED
                           ? 'text-green-600'
                           : 'text-gray-600'
                       }
                     >
-                      {statusText[item.status]}
+                      {statusText[item.getStatus()]}
                     </span>
                   </div>
                 </div>
                 <Link
-                  to={`/items/${item.id}`}
+                  to={`/items/${item.getId()}`}
                   className="block w-full text-center bg-indigo-50 text-indigo-600 py-2 rounded-lg hover:bg-indigo-100"
                 >
                   查看详情

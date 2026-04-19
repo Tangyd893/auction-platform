@@ -29,5 +29,15 @@ services:
       timeout: 5s
       retries: 5
 
+  envoy:
+    image: envoyproxy/envoy:v1.29
+    container_name: auction_envoy
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   postgres_data:

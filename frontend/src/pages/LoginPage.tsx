@@ -1,25 +1,21 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { authApi } from '../lib/api'
-import { useAuthStore } from '../stores/auth'
+import { login } from '../stores/auth'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { setAuth } = useAuthStore()
 
   const loginMutation = useMutation({
-    mutationFn: () => authApi.login(username, password),
-    onSuccess: (res) => {
-      const { token, user } = res.data
-      setAuth(token, user)
+    mutationFn: () => login(username, password),
+    onSuccess: () => {
       navigate('/')
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.message || '登录失败')
+    onError: (err: Error) => {
+      setError(err.message || '登录失败')
     },
   })
 

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { orderApi } from '../lib/api'
+import { orderClient, proto } from '../grpc/client'
 import { useAuthStore } from '../stores/auth'
 
 export default function OrdersPage() {
@@ -8,24 +8,24 @@ export default function OrdersPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => orderApi.list({ page: 1, pageSize: 20 }),
+    queryFn: () => orderClient.list(user?.id || 0),
   })
 
-  const orders = data?.data?.orders || []
+  const orders = data?.orders || []
 
   const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
 
-  const statusText: Record<string, { text: string; color: string }> = {
-    pending: { text: '待支付', color: 'text-yellow-600 bg-yellow-50' },
-    paid: { text: '已支付', color: 'text-blue-600 bg-blue-50' },
-    shipped: { text: '已发货', color: 'text-indigo-600 bg-indigo-50' },
-    completed: { text: '已完成', color: 'text-green-600 bg-green-50' },
-    cancelled: { text: '已取消', color: 'text-gray-600 bg-gray-50' },
+  const statusText: Record<number, { text: string; color: string }> = {
+    0: { text: '待支付', color: 'text-yellow-600 bg-yellow-50' },
+    1: { text: '已支付', color: 'text-blue-600 bg-blue-50' },
+    2: { text: '已发货', color: 'text-indigo-600 bg-indigo-50' },
+    3: { text: '已完成', color: 'text-green-600 bg-green-50' },
+    4: { text: '已取消', color: 'text-gray-600 bg-gray-50' },
   }
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      orderApi.updateStatus(id, status),
+    mutationFn: ({ id, status }: { id: number; status: number }) =>
+      orderClient.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
     },
@@ -67,34 +67,34 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {orders.map((order: any) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium">#{order.id}</td>
+              {orders.map((order: proto.Order) => (
+                <tr key={order.getId()} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 font-medium">#{order.getId()}</td>
                   <td className="px-6 py-4">
-                    <span className="text-indigo-600">#{order.itemId}</span>
+                    <span className="text-indigo-600">#{order.getItemId()}</span>
                   </td>
                   <td className="px-6 py-4 font-semibold">
-                    {formatPrice(order.finalPrice)}
+                    {formatPrice(order.getFinalPrice())}
                   </td>
                   <td className="px-6 py-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
-                        statusText[order.status]?.color || 'text-gray-600 bg-gray-50'
+                        statusText[order.getStatus()]?.color || 'text-gray-600 bg-gray-50'
                       }`}
                     >
-                      {statusText[order.status]?.text || order.status}
+                      {statusText[order.getStatus()]?.text || order.getStatus()}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-gray-500">
-                    {new Date(order.createdAt * 1000).toLocaleString()}
+                    {new Date(order.getCreatedAt() * 1000).toLocaleString()}
                   </td>
                   <td className="px-6 py-4">
-                    {order.status === 'pending' && user?.role === 'buyer' && (
+                    {order.getStatus() === 0 && user?.role === 'buyer' && (
                       <button
                         onClick={() =>
                           updateStatusMutation.mutate({
-                            id: order.id,
-                            status: 'paid',
+                            id: order.getId(),
+                            status: 1, // paid
                           })
                         }
                         disabled={updateStatusMutation.isPending}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { authApi } from '../lib/api'
+import { authClient, proto } from '../grpc/client'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -15,29 +15,37 @@ export default function RegisterPage() {
   const navigate = useNavigate()
 
   const registerMutation = useMutation({
-    mutationFn: () => authApi.register(form),
+    mutationFn: async () => {
+      if (form.password !== form.confirmPassword) {
+        throw new Error('两次输入的密码不一致')
+      }
+      if (form.password.length < 6) {
+        throw new Error('密码长度至少为6位')
+      }
+
+      const roleMap: Record<string, proto.UserRole> = {
+        buyer: proto.UserRole.BUYER,
+        seller: proto.UserRole.SELLER,
+      }
+
+      await authClient.register(
+        form.username,
+        form.password,
+        form.email,
+        roleMap[form.role] || proto.UserRole.BUYER
+      )
+    },
     onSuccess: () => {
       navigate('/login')
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.message || '注册失败')
+    onError: (err: Error) => {
+      setError(err.message || '注册失败')
     },
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-
-    if (form.password !== form.confirmPassword) {
-      setError('两次输入的密码不一致')
-      return
-    }
-
-    if (form.password.length < 6) {
-      setError('密码长度至少为6位')
-      return
-    }
-
     registerMutation.mutate()
   }
 

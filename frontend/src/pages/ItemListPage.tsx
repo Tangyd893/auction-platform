@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { itemApi } from '../lib/api'
-import { Search, Filter } from 'lucide-react'
+import { itemClient, proto } from '../grpc/client'
+import { Search } from 'lucide-react'
+
+const STATUS_MAP: Record<string, number> = {
+  listed: proto.ItemStatus.LISTED,
+  draft: proto.ItemStatus.DRAFT,
+  sold: proto.ItemStatus.SOLD,
+  unsold: proto.ItemStatus.UNSOLD,
+}
 
 export default function ItemListPage() {
   const [status, setStatus] = useState('listed')
@@ -11,11 +18,11 @@ export default function ItemListPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['items', status, keyword, page],
-    queryFn: () => itemApi.list({ status, keyword: keyword || undefined, page, pageSize: 12 }),
+    queryFn: () => itemClient.list({ status, keyword: keyword || undefined, page, pageSize: 12 }),
   })
 
-  const items = data?.data?.items || []
-  const total = data?.data?.total || 0
+  const items = data?.items || []
+  const total = data?.total || 0
   const totalPages = Math.ceil(total / 12)
 
   const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
@@ -66,36 +73,36 @@ export default function ItemListPage() {
       ) : (
         <>
           <div className="grid grid-cols-4 gap-6">
-            {items.map((item: any) => (
+            {items.map((item: proto.Item) => (
               <Link
-                key={item.id}
-                to={`/items/${item.id}`}
+                key={item.getId()}
+                to={`/items/${item.getId()}`}
                 className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition"
               >
                 <img
-                  src={item.imageUrl || 'https://via.placeholder.com/300x200'}
-                  alt={item.title}
+                  src={item.getImageUrl() || 'https://via.placeholder.com/300x200'}
+                  alt={item.getTitle()}
                   className="w-full h-40 object-cover"
                 />
                 <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-2 truncate">{item.title}</h3>
+                  <h3 className="font-semibold text-lg mb-2 truncate">{item.getTitle()}</h3>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">当前价</span>
                       <span className="text-indigo-600 font-bold">
-                        {formatPrice(item.currentPrice)}
+                        {formatPrice(item.getCurrentPrice())}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">起拍价</span>
                       <span className="text-gray-700">
-                        {formatPrice(item.startPrice)}
+                        {formatPrice(item.getStartPrice())}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">加价幅度</span>
                       <span className="text-gray-700">
-                        {formatPrice(item.bidIncrement)}
+                        {formatPrice(item.getBidIncrement())}
                       </span>
                     </div>
                   </div>

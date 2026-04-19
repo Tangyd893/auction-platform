@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { bidApi } from '../lib/api'
+import { bidClient, proto } from '../grpc/client'
 import { useAuthStore } from '../stores/auth'
 
 export default function MyBidsPage() {
@@ -8,10 +8,10 @@ export default function MyBidsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-bids'],
-    queryFn: () => bidApi.myBids(),
+    queryFn: () => bidClient.myBids(user?.id || 0),
   })
 
-  const bids = data?.data?.bids || []
+  const bids = data?.bids || []
 
   const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
 
@@ -54,30 +54,30 @@ export default function MyBidsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {bids.map((bid: any) => (
-                <tr key={bid.id} className="hover:bg-gray-50">
+              {bids.map((bid: proto.Bid) => (
+                <tr key={bid.getId()} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <Link
-                      to={`/items/${bid.itemId}`}
+                      to={`/items/${bid.getItemId()}`}
                       className="text-indigo-600 hover:text-indigo-800"
                     >
-                      #{bid.itemId}
+                      #{bid.getItemId()}
                     </Link>
                   </td>
                   <td className="px-6 py-4 font-semibold">
-                    {formatPrice(bid.amount)}
+                    {formatPrice(bid.getAmount())}
                   </td>
                   <td className="px-6 py-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
-                        statusText[bid.status]?.color || 'text-gray-600 bg-gray-50'
+                        statusText[bid.getStatus()]?.color || 'text-gray-600 bg-gray-50'
                       }`}
                     >
-                      {statusText[bid.status]?.text || bid.status}
+                      {statusText[bid.getStatus()]?.text || bid.getStatus()}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-gray-500">
-                    {new Date(bid.createdAt * 1000).toLocaleString()}
+                    {new Date(bid.getCreatedAt() * 1000).toLocaleString()}
                   </td>
                 </tr>
               ))}

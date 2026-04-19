@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { itemApi } from '../lib/api'
+import { itemClient } from '../grpc/client'
 
 export default function CreateItemPage() {
   const navigate = useNavigate()
@@ -11,7 +11,7 @@ export default function CreateItemPage() {
     imageUrl: '',
     startPrice: '',
     reservePrice: '',
-    bidIncrement: '100',
+    bidIncrement: '1',
     startTime: '',
     endTime: '',
   })
@@ -23,12 +23,12 @@ export default function CreateItemPage() {
       const start = form.startTime ? new Date(form.startTime) : now
       const end = form.endTime ? new Date(form.endTime) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-      return itemApi.create({
+      return itemClient.create({
         title: form.title,
         description: form.description,
         imageUrl: form.imageUrl,
         startPrice: Math.floor(parseFloat(form.startPrice) * 100),
-        reservePrice: Math.floor(parseFloat(form.reservePrice) * 100),
+        reservePrice: Math.floor(parseFloat(form.reservePrice || '0') * 100),
         bidIncrement: Math.floor(parseFloat(form.bidIncrement) * 100),
         startTime: Math.floor(start.getTime() / 1000),
         endTime: Math.floor(end.getTime() / 1000),
@@ -37,8 +37,8 @@ export default function CreateItemPage() {
     onSuccess: () => {
       navigate('/my-items')
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.message || '创建失败')
+    onError: (err: Error) => {
+      setError(err.message || '创建失败')
     },
   })
 

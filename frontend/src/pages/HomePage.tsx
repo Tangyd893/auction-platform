@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { itemApi } from '../lib/api'
+import { itemClient, proto } from '../grpc/client'
 import { ArrowRight, TrendingUp, Shield, Clock } from 'lucide-react'
 
 export default function HomePage() {
-  const { data: itemsData } = useQuery({
+  const { data } = useQuery({
     queryKey: ['items', 'listed'],
-    queryFn: () => itemApi.list({ status: 'listed', pageSize: 6 }),
+    queryFn: () => itemClient.list({ status: 'listed', pageSize: 6 }),
   })
 
-  const items = itemsData?.data?.items || []
+  const items = data?.items || []
+
+  const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
 
   return (
     <div>
@@ -63,29 +65,29 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-6">
-          {items.map((item: any) => (
+          {items.map((item: proto.Item) => (
             <Link
-              key={item.id}
-              to={`/items/${item.id}`}
+              key={item.getId()}
+              to={`/items/${item.getId()}`}
               className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition"
             >
               <img
-                src={item.imageUrl || 'https://via.placeholder.com/300x200'}
-                alt={item.title}
+                src={item.getImageUrl() || 'https://via.placeholder.com/300x200'}
+                alt={item.getTitle()}
                 className="w-full h-48 object-cover"
               />
               <div className="p-4">
-                <h3 className="font-semibold text-lg mb-2 truncate">{item.title}</h3>
+                <h3 className="font-semibold text-lg mb-2 truncate">{item.getTitle()}</h3>
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span>当前价</span>
                   <span>起拍价</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-indigo-600 font-bold">
-                    ¥{(item.currentPrice / 100).toFixed(2)}
+                    {formatPrice(item.getCurrentPrice())}
                   </span>
                   <span className="text-gray-500">
-                    ¥{(item.startPrice / 100).toFixed(2)}
+                    {formatPrice(item.getStartPrice())}
                   </span>
                 </div>
               </div>
