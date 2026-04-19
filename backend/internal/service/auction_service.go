@@ -517,6 +517,8 @@ func (s *AuctionService) broadcastBidUpdate(itemID int64, bid *model.Bid, curren
 	}
 }
 
+// StreamAuction Server Streaming: 拍卖大厅
+// 客户端订阅多个拍品，服务端定期推送所有订阅拍品的最新状态
 func (s *AuctionService) StreamAuction(req *auction.StreamAuctionRequest, stream auction.AuctionService_StreamAuctionServer) error {
 	ctx := stream.Context()
 
@@ -525,13 +527,50 @@ func (s *AuctionService) StreamAuction(req *auction.StreamAuctionRequest, stream
 	}
 	defer s.connMgr.RemoveStream()
 	bidiStreamsActive.Inc()
+	activeConnections.Inc()
 	defer bidiStreamsActive.Dec()
+	defer activeConnections.Dec()
+
+	itemIDs := req.GetItemIds()
+	if len(itemIDs) == 0 {
+		return status.Error(codes.InvalidArgument, "item_ids cannot be empty")
+	}
+	if len(itemIDs) > 50 {
+		return status.Error(codes.InvalidArgument, "item_ids cannot exceed 50")
+	}
+
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(5 * time.Second):
+		case <-ticker.C:
+			// 批量查询所有订阅拍品的最新状态
+			for _, itemID := range itemIDs {
+				item, err := s.itemService.GetByID(ctx, itemID)
+				if err != nil {
+					continue // 单个查失败不影响其他
+				}
+
+				bids, _, _, err := s.bidService.GetBidsByItemID(ctx, itemID)
+				if err != nil {
+					continue
+				}
+
+				update := &auction.AuctionUpdate{
+					ItemId:       item.ID,
+					Title:        item.Title,
+					CurrentPrice: item.CurrentPrice,
+					BidCount:     int64(len(bids)),
+					EndTime:      item.EndTime.Unix(),
+				}
+
+				if err := stream.Send(update); err != nil {
+					return err
+				}
+			}
 		}
 	}
 }
