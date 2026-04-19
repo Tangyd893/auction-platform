@@ -1,12 +1,10 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 

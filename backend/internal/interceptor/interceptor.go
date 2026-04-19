@@ -8,7 +8,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -79,7 +78,7 @@ func StreamServerInterceptor() grpc.StreamServerInterceptor {
 
 		log.Debug().
 			Str("method", info.FullMethod).
-			Dur("duration", duration).
+			Float64("duration_seconds", duration).
 			Str("code", code.String()).
 			Msg("gRPC stream completed")
 

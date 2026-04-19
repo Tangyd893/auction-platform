@@ -4,8 +4,6 @@ package auction;
 
 option go_package = "auction-platform/proto/gen/auction;auction";
 
-import "google/api/annotations.proto";
-
 // ============ 枚举定义 ============
 
 enum ItemStatus {
@@ -280,85 +278,37 @@ message Error {
 service AuctionService {
   // 用户
   rpc Register(RegisterRequest) returns (User) {
-    option (google.api.http) = {
-      post: "/api/auth/register"
-      body: "*"
-    };
   }
   rpc Login(LoginRequest) returns (LoginResponse) {
-    option (google.api.http) = {
-      post: "/api/auth/login"
-      body: "*"
-    };
   }
   rpc GetUser(GetUserRequest) returns (User) {
-    option (google.api.http) = {
-      get: "/api/users/{id}"
-    };
   }
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
-    option (google.api.http) = {
-      get: "/api/users"
-    };
   }
 
   // 拍品
   rpc CreateItem(CreateItemRequest) returns (Item) {
-    option (google.api.http) = {
-      post: "/api/items"
-      body: "*"
-    };
   }
   rpc UpdateItem(UpdateItemRequest) returns (Item) {
-    option (google.api.http) = {
-      put: "/api/items/{id}"
-      body: "*"
-    };
   }
   rpc GetItem(GetItemRequest) returns (Item) {
-    option (google.api.http) = {
-      get: "/api/items/{id}"
-    };
   }
   rpc ListItems(ListItemsRequest) returns (ListItemsResponse) {
-    option (google.api.http) = {
-      get: "/api/items"
-    };
   }
   rpc ListMyItems(ListMyItemsRequest) returns (ListItemsResponse) {
-    option (google.api.http) = {
-      get: "/api/items/my"
-    };
   }
   rpc CancelItem(CancelItemRequest) returns (Item) {
-    option (google.api.http) = {
-      delete: "/api/items/{id}"
-    };
   }
 
   // 出价
   rpc PlaceBid(PlaceBidRequest) returns (PlaceBidResponse) {
-    option (google.api.http) = {
-      post: "/api/bids"
-      body: "*"
-    };
   }
   rpc GetBids(GetBidsRequest) returns (GetBidsResponse) {
-    option (google.api.http) = {
-      get: "/api/items/{item_id}/bids"
-    };
   }
   rpc GetMyBids(GetMyBidsRequest) returns (GetBidsResponse) {
-    option (google.api.http) = {
-      get: "/api/bids/my"
-    };
   }
   // Client Streaming: 批量出价
   rpc PlaceBidBatch(stream PlaceBidRequest) returns (PlaceBidResponse) {
-    option (google.api.http) = {
-      post: "/api/bids/batch"
-      body: "*"
-    };
   }
   // Server Streaming: 订阅出价更新
   rpc StreamBids(StreamBidsRequest) returns (stream StreamBidsResponse) {}
@@ -371,25 +321,11 @@ service AuctionService {
 
   // 订单
   rpc CreateOrder(CreateOrderRequest) returns (Order) {
-    option (google.api.http) = {
-      post: "/api/orders"
-      body: "*"
-    };
   }
   rpc GetOrder(GetOrderRequest) returns (Order) {
-    option (google.api.http) = {
-      get: "/api/orders/{id}"
-    };
   }
   rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse) {
-    option (google.api.http) = {
-      get: "/api/orders"
-    };
   }
   rpc UpdateOrderStatus(UpdateOrderStatusRequest) returns (Order) {
-    option (google.api.http) = {
-      patch: "/api/orders/{id}/status"
-      body: "*"
-    };
   }
 }

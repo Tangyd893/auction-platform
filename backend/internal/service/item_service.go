@@ -99,7 +99,7 @@ func (s *ItemService) Update(ctx context.Context, req *UpdateItemRequest, userID
 		item.Description = req.Description
 	}
 	if req.ImageUrl != "" {
-		item.ImageUrl = req.ImageUrl
+		item.ImageURL = req.ImageUrl
 	}
 	if req.ReservePrice > 0 {
 		item.ReservePrice = req.ReservePrice
@@ -150,7 +150,7 @@ func (s *ItemService) Cancel(ctx context.Context, id int64, userID int64) (*mode
 		return nil, ErrNotYourItem
 	}
 
-	if item.Status == string(model.ItemStatusSold) || item.Status == string(model.ItemStatusCancelled) {
+	if item.Status == string(model.ItemStatusSold) || item.Status == string(model.ItemStatusCancel) {
 		return nil, errors.New("cannot cancel this item")
 	}
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -23,7 +24,7 @@ type AuctionService struct {
 	subMutex      sync.RWMutex
 }
 
-func NewAuctionService(auth, item, bid, order, user *AuthService) *AuctionService {
+func NewAuctionService(auth *AuthService, item *ItemService, bid *BidService, order *OrderService, user *UserService) *AuctionService {
 	svc := &AuctionService{
 		authService:   auth,
 		itemService:   item,
@@ -175,29 +176,28 @@ func (s *AuctionService) GetMyBids(ctx context.Context, req *auction.GetMyBidsRe
 }
 
 // Client Streaming: 批量出价
-func (s *AuctionService) PlaceBidBatch(stream auction.AuctionService_PlaceBidBatchServer) (*auction.PlaceBidResponse, error) {
+func (s *AuctionService) PlaceBidBatch(stream auction.AuctionService_PlaceBidBatchServer) error {
 	userID := getUserIDFromContext(stream.Context())
-	var lastResponse *auction.PlaceBidResponse
+	var lastBid *auction.PlaceBidResponse
 
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
-			return lastResponse, nil
+			return stream.SendAndClose(lastBid)
 		}
 		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+			return status.Error(codes.Internal, err.Error())
 		}
 
-		bid, currentPrice, isWinning, err := s.bidService.PlaceBid(stream.Context(), req.ItemId, userID, req.Amount)
+		_, currentPrice, isWinning, err := s.bidService.PlaceBid(stream.Context(), req.ItemId, userID, req.Amount)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		lastResponse = &auction.PlaceBidResponse{
-			BidId:        bid.ID,
+		lastBid = &auction.PlaceBidResponse{
 			CurrentPrice: currentPrice,
 			IsWinning:    isWinning,
-			Message:      "bid placed successfully",
+			Message:      "bid received",
 		}
 	}
 }
@@ -207,28 +207,19 @@ func (s *AuctionService) StreamBids(req *auction.StreamBidsRequest, stream aucti
 	itemID := req.ItemId
 	ctx := stream.Context()
 
-	bids, highestPrice, highestBidder, err := s.bidService.GetBidsByItemID(ctx, itemID)
+	_, highestPrice, highestBidder, err := s.bidService.GetBidsByItemID(ctx, itemID)
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	// 发送当前状态
+	// 发送初始状态
 	if err := stream.Send(&auction.StreamBidsResponse{
-		Payload: &auction.StreamBidsResponse_BidUpdate{
-			BidUpdate: &auction.StreamBidsResponse{
-				Payload: &auction.StreamBidsResponse_BidUpdate{
-					BidUpdate: &auction.StreamBidsResponse{
-						Payload: nil,
-					},
-				},
-			},
-		},
+		CurrentPrice: highestPrice,
+		TotalBids:    0,
 	}); err != nil {
 		return err
 	}
 
-	_ = bids
-	_ = highestPrice
 	_ = highestBidder
 
 	// TODO: 实现 Redis Pub/Sub 实时推送
@@ -322,7 +313,7 @@ func (s *AuctionService) ListOrders(ctx context.Context, req *auction.ListOrders
 }
 
 func (s *AuctionService) UpdateOrderStatus(ctx context.Context, req *auction.UpdateOrderStatusRequest) (*auction.Order, error) {
-	order, err := s.orderService.UpdateOrderStatus(ctx, req.Id, req.Status)
+	order, err := s.orderService.UpdateOrderStatus(ctx, req.Id, fmt.Sprintf("%d", req.Status))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

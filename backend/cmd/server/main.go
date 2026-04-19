@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -105,6 +103,12 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to listen on gRPC port")
 	}
+
+	go func() {
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error().Err(err).Msg("gRPC server failed")
+		}
+	}()
 
 	// 启动 HTTP
 	go func() {
