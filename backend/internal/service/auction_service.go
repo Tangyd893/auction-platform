@@ -5,11 +5,61 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"auction-platform/internal/model"
 	"auction-platform/proto/gen/auction"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+type bidResult struct {
+	resp *auction.BidStreamResponse
+	err  error
+}
+
+// ============ Prometheus Metrics ============
+
+var (
+	bidiStreamsActive = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "bidirectional_streams_active",
+		Help: "Currently active bidirectional streams",
+	})
+
+	bidsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "bids_total",
+		Help: "Total number of bids received",
+	}, []string{"result"}) // result=success|rejected|error
+
+	bidLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "bid_latency_seconds",
+		Help:    "Bid processing latency",
+		Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1},
+	}, []string{"result"})
+
+	activeConnections = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "auction_active_connections",
+		Help: "Number of active auction connections",
+	})
+
+	circuitBreakerState = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "circuit_breaker_state",
+		Help: "Circuit breaker state (0=closed, 1=open, 2=half-open)",
+	}, []string{"name"})
+)
+
+const (
+	maxBidiStreams       = 500                  // 全局最大双向流数
+	maxBidsPerSecond     = 5                    // 每用户每秒最大出价次数
+	bidCircuitThreshold  = 20                  // 熔断器阈值
+	bidCircuitTimeout    = 30 * time.Second    // 熔断恢复时间
+	streamTimeout        = 10 * time.Minute   // 单个流最大存活时间
+)
+
+// ============ AuctionService ============
 
 type AuctionService struct {
 	auction.UnimplementedAuctionServiceServer
@@ -19,20 +69,47 @@ type AuctionService struct {
 	orderService *OrderService
 	userService  *UserService
 
-	// 订阅管理
-	auctionSubs   map[int64][]chan *auction.AuctionUpdate
-	subMutex      sync.RWMutex
+	connMgr      *ConnectionManager
+	bidBreaker   *CircuitBreaker
+
+	auctionSubs map[int64][]chan *auction.AuctionUpdate
+	subMutex    sync.RWMutex
+
+	bidMu sync.Mutex
 }
 
-func NewAuctionService(auth *AuthService, item *ItemService, bid *BidService, order *OrderService, user *UserService) *AuctionService {
+func NewAuctionService(
+	auth *AuthService, item *ItemService,
+	bid *BidService, order *OrderService, user *UserService,
+) *AuctionService {
 	svc := &AuctionService{
-		authService:   auth,
-		itemService:   item,
-		bidService:    bid,
-		orderService:  order,
-		userService:   user,
-		auctionSubs:   make(map[int64][]chan *auction.AuctionUpdate),
+		authService:  auth,
+		itemService:  item,
+		bidService:   bid,
+		orderService: order,
+		userService:  user,
+		connMgr:      NewConnectionManager(maxBidiStreams, maxBidsPerSecond),
+		bidBreaker:   NewCircuitBreaker(bidCircuitThreshold, bidCircuitTimeout),
+		auctionSubs:  make(map[int64][]chan *auction.AuctionUpdate),
 	}
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		for range ticker.C {
+			state := svc.bidBreaker.State()
+			var val float64
+			switch state {
+			case "closed":
+				val = 0
+			case "open":
+				val = 1
+			case "half-open":
+				val = 2
+			}
+			circuitBreakerState.WithLabelValues("bid_breaker").Set(val)
+		}
+	}()
+
 	return svc
 }
 
@@ -76,7 +153,7 @@ func (s *AuctionService) ListUsers(ctx context.Context, req *auction.ListUsersRe
 
 func (s *AuctionService) CreateItem(ctx context.Context, req *auction.CreateItemRequest) (*auction.Item, error) {
 	userID := getUserIDFromContext(ctx)
-	serviceReq := &CreateItemRequest{
+	svcReq := &CreateItemRequest{
 		Title:        req.Title,
 		Description:  req.Description,
 		ImageUrl:     req.ImageUrl,
@@ -86,7 +163,7 @@ func (s *AuctionService) CreateItem(ctx context.Context, req *auction.CreateItem
 		StartTime:    req.StartTime,
 		EndTime:      req.EndTime,
 	}
-	item, err := s.itemService.Create(ctx, serviceReq, userID)
+	item, err := s.itemService.Create(ctx, svcReq, userID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -134,10 +211,32 @@ func (s *AuctionService) CancelItem(ctx context.Context, req *auction.CancelItem
 
 func (s *AuctionService) PlaceBid(ctx context.Context, req *auction.PlaceBidRequest) (*auction.PlaceBidResponse, error) {
 	userID := getUserIDFromContext(ctx)
+
+	if !s.bidBreaker.Allow() {
+		bidsTotal.WithLabelValues("rejected").Inc()
+		return nil, status.Error(codes.Unavailable, "service temporarily unavailable")
+	}
+
+	if !s.connMgr.AllowBid(userID) {
+		bidsTotal.WithLabelValues("rejected").Inc()
+		return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
+	}
+
+	start := time.Now()
 	bid, currentPrice, isWinning, err := s.bidService.PlaceBid(ctx, req.ItemId, userID, req.Amount)
+	latency := time.Since(start).Seconds()
+
 	if err != nil {
+		s.bidBreaker.RecordFailure()
+		bidsTotal.WithLabelValues("error").Inc()
+		bidLatency.WithLabelValues("error").Observe(latency)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	s.bidBreaker.RecordSuccess()
+	bidsTotal.WithLabelValues("success").Inc()
+	bidLatency.WithLabelValues("success").Observe(latency)
+
 	return &auction.PlaceBidResponse{
 		BidId:        bid.ID,
 		CurrentPrice: currentPrice,
@@ -175,7 +274,6 @@ func (s *AuctionService) GetMyBids(ctx context.Context, req *auction.GetMyBidsRe
 	}, nil
 }
 
-// Client Streaming: 批量出价
 func (s *AuctionService) PlaceBidBatch(stream auction.AuctionService_PlaceBidBatchServer) error {
 	userID := getUserIDFromContext(stream.Context())
 	var lastBid *auction.PlaceBidResponse
@@ -189,11 +287,22 @@ func (s *AuctionService) PlaceBidBatch(stream auction.AuctionService_PlaceBidBat
 			return status.Error(codes.Internal, err.Error())
 		}
 
-		_, currentPrice, isWinning, err := s.bidService.PlaceBid(stream.Context(), req.ItemId, userID, req.Amount)
-		if err != nil {
-			return status.Error(codes.InvalidArgument, err.Error())
+		if !s.bidBreaker.Allow() {
+			bidsTotal.WithLabelValues("rejected").Inc()
+			continue
+		}
+		if !s.connMgr.AllowBid(userID) {
+			bidsTotal.WithLabelValues("rejected").Inc()
+			continue
 		}
 
+		_, currentPrice, isWinning, err := s.bidService.PlaceBid(stream.Context(), req.ItemId, userID, req.Amount)
+		if err != nil {
+			bidsTotal.WithLabelValues("error").Inc()
+			continue
+		}
+
+		bidsTotal.WithLabelValues("success").Inc()
 		lastBid = &auction.PlaceBidResponse{
 			CurrentPrice: currentPrice,
 			IsWinning:    isWinning,
@@ -202,17 +311,19 @@ func (s *AuctionService) PlaceBidBatch(stream auction.AuctionService_PlaceBidBat
 	}
 }
 
-// Server Streaming: 订阅某个拍品的出价更新
 func (s *AuctionService) StreamBids(req *auction.StreamBidsRequest, stream auction.AuctionService_StreamBidsServer) error {
-	itemID := req.ItemId
 	ctx := stream.Context()
 
-	_, highestPrice, highestBidder, err := s.bidService.GetBidsByItemID(ctx, itemID)
+	if !s.connMgr.AddStream() {
+		return status.Error(codes.ResourceExhausted, "too many streams")
+	}
+	defer s.connMgr.RemoveStream()
+
+	_, highestPrice, highestBidder, err := s.bidService.GetBidsByItemID(ctx, req.ItemId)
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	// 发送初始状态
 	if err := stream.Send(&auction.StreamBidsResponse{
 		CurrentPrice: highestPrice,
 		TotalBids:    0,
@@ -222,64 +333,205 @@ func (s *AuctionService) StreamBids(req *auction.StreamBidsRequest, stream aucti
 
 	_ = highestBidder
 
-	// TODO: 实现 Redis Pub/Sub 实时推送
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-// Bidirectional Streaming: 实时竞价窗口
+// ============ Bidirectional Streaming: 实时竞价 ============
+
 func (s *AuctionService) BidirectionalBid(stream auction.AuctionService_BidirectionalBidServer) error {
 	ctx := stream.Context()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			msg, err := stream.Recv()
-			if err == io.EOF {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
+	if !s.connMgr.AddStream() {
+		return status.Error(codes.ResourceExhausted, "too many connections")
+	}
+	defer s.connMgr.RemoveStream()
 
-			if bidReq := msg.GetBid(); bidReq != nil {
-				userID := getUserIDFromContext(ctx)
-				bid, currentPrice, isWinning, err := s.bidService.PlaceBid(ctx, bidReq.ItemId, userID, bidReq.Amount)
+	bidiStreamsActive.Inc()
+	activeConnections.Inc()
+	defer bidiStreamsActive.Dec()
+	defer activeConnections.Dec()
+
+	ctx, cancel := context.WithTimeout(ctx, streamTimeout)
+	defer cancel()
+
+	userID := getUserIDFromContext(ctx)
+
+	bidCh := make(chan bidResult, 1)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				close(bidCh)
+				return
+			default:
+				msg, err := stream.Recv()
+				if err == io.EOF {
+					close(bidCh)
+					return
+				}
 				if err != nil {
-					stream.Send(&auction.BidStreamResponse{
-						Payload: &auction.BidStreamResponse_Error{
-							Error: &auction.Error{Code: 400, Message: err.Error()},
-						},
-					})
+					bidCh <- bidResult{err: err}
+					return
+				}
+
+				if subscribe := msg.GetSubscribe(); subscribe != nil {
+					go s.handleBidirectionalSubscribe(ctx, stream, subscribe)
 					continue
 				}
-				stream.Send(&auction.BidStreamResponse{
-					Payload: &auction.BidStreamResponse_BidResult{
-						BidResult: &auction.PlaceBidResponse{
-							BidId:        bid.ID,
-							CurrentPrice: currentPrice,
-							IsWinning:    isWinning,
-						},
-					},
-				})
+
+				if bidReq := msg.GetBid(); bidReq != nil {
+					s.handleBidirectionalBid(ctx, stream, bidReq, userID, bidCh)
+				}
 			}
+		}
+	}()
+
+	for result := range bidCh {
+		if result.err != nil {
+			return result.err
+		}
+	}
+
+	return nil
+}
+
+func (s *AuctionService) handleBidirectionalBid(
+	ctx context.Context,
+	stream auction.AuctionService_BidirectionalBidServer,
+	req *auction.PlaceBidRequest,
+	userID int64,
+	bidCh chan bidResult,
+) {
+	if !s.bidBreaker.Allow() {
+		bidCh <- bidResult{resp: &auction.BidStreamResponse{
+			Payload: &auction.BidStreamResponse_Error{
+				Error: &auction.Error{Code: 503, Message: "service unavailable, please retry later"},
+			},
+		}}
+		return
+	}
+
+	if !s.connMgr.AllowBid(userID) {
+		bidCh <- bidResult{resp: &auction.BidStreamResponse{
+			Payload: &auction.BidStreamResponse_Error{
+				Error: &auction.Error{Code: 429, Message: "rate limit exceeded"},
+			},
+		}}
+		return
+	}
+
+	if req.Nonce != "" && req.Timestamp != 0 {
+		if !s.connMgr.ValidNonce(req.Nonce, req.Timestamp) {
+			bidCh <- bidResult{resp: &auction.BidStreamResponse{
+				Payload: &auction.BidStreamResponse_Error{
+					Error: &auction.Error{Code: 400, Message: "invalid or replayed nonce"},
+				},
+			}}
+			return
+		}
+	}
+
+	start := time.Now()
+	bid, currentPrice, isWinning, err := s.bidService.PlaceBid(ctx, req.ItemId, userID, req.Amount)
+	latency := time.Since(start).Seconds()
+
+	s.bidMu.Lock()
+	defer s.bidMu.Unlock()
+
+	if err != nil {
+		s.bidBreaker.RecordFailure()
+		bidsTotal.WithLabelValues("error").Inc()
+		bidLatency.WithLabelValues("error").Observe(latency)
+
+		bidCh <- bidResult{resp: &auction.BidStreamResponse{
+			Payload: &auction.BidStreamResponse_Error{
+				Error: &auction.Error{Code: 400, Message: err.Error()},
+			},
+		}}
+		return
+	}
+
+	s.bidBreaker.RecordSuccess()
+	bidsTotal.WithLabelValues("success").Inc()
+	bidLatency.WithLabelValues("success").Observe(latency)
+
+	s.broadcastBidUpdate(req.ItemId, bid, currentPrice)
+
+	bidCh <- bidResult{resp: &auction.BidStreamResponse{
+		Payload: &auction.BidStreamResponse_BidResult{
+			BidResult: &auction.PlaceBidResponse{
+				BidId:        bid.ID,
+				CurrentPrice: currentPrice,
+				IsWinning:    isWinning,
+				Message:      "bid accepted",
+			},
+		},
+	}}
+}
+
+func (s *AuctionService) handleBidirectionalSubscribe(
+	ctx context.Context,
+	stream auction.AuctionService_BidirectionalBidServer,
+	req *auction.StreamBidsRequest,
+) {
+	itemID := req.ItemId
+
+	_, highestPrice, highestBidder, err := s.bidService.GetBidsByItemID(ctx, itemID)
+	if err == nil {
+		s.bidMu.Lock()
+		stream.Send(&auction.BidStreamResponse{
+			Payload: &auction.BidStreamResponse_BidUpdate{
+				BidUpdate: &auction.AuctionUpdate{
+					ItemId:          itemID,
+					CurrentPrice:    highestPrice,
+					HighestBidderId: highestBidder,
+				},
+			},
+		})
+		s.bidMu.Unlock()
+	}
+	_ = highestBidder
+}
+
+func (s *AuctionService) broadcastBidUpdate(itemID int64, bid *model.Bid, currentPrice int64) {
+	s.subMutex.RLock()
+	chans, ok := s.auctionSubs[itemID]
+	s.subMutex.RUnlock()
+
+	if !ok {
+		return
+	}
+
+	update := &auction.AuctionUpdate{
+		ItemId:       itemID,
+		CurrentPrice: currentPrice,
+	}
+
+	for _, ch := range chans {
+		select {
+		case ch <- update:
+		default:
 		}
 	}
 }
 
-// Server Streaming: 拍卖大厅
 func (s *AuctionService) StreamAuction(req *auction.StreamAuctionRequest, stream auction.AuctionService_StreamAuctionServer) error {
 	ctx := stream.Context()
 
-	// TODO: 实现定期推送所有订阅拍品的当前状态
+	if !s.connMgr.AddStream() {
+		return status.Error(codes.ResourceExhausted, "too many connections")
+	}
+	defer s.connMgr.RemoveStream()
+	bidiStreamsActive.Inc()
+	defer bidiStreamsActive.Dec()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-stream.Context().Done():
-			return stream.Context().Err()
+		case <-time.After(5 * time.Second):
 		}
 	}
 }

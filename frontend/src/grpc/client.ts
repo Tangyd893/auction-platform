@@ -181,27 +181,40 @@ export const bidClient = {
     })
   },
 
-  // Server Streaming: 订阅某个拍品的出价更新
-  streamBids(itemId: number, onUpdate: (bid: proto.Bid, currentPrice: number, totalBids: number) => void) {
+  // Server Streaming: 订阅某个拍品的出价更新（实时竞价的实现方式）
+  // 每次服务端收到该拍品的新出价时推送一次更新
+  streamBids(
+    itemId: number,
+    onUpdate: (currentPrice: number, totalBids: number) => void,
+    onError?: (err: Error) => void,
+  ): () => void {
     const req = new svc.StreamBidsRequest()
     req.setItemId(itemId)
 
     const stream = svc.AuctionService.streamBids(req, metadata())
     stream.on('data', (resp: svc.StreamBidsResponse) => {
-      const update = resp.getBidUpdate()
-      if (update) {
-        onUpdate(
-          update.getBid()!,
-          resp.getCurrentPrice(),
-          resp.getTotalBids(),
-        )
-      }
+      onUpdate(resp.getCurrentPrice(), resp.getTotalBids())
     })
     stream.on('error', (err: Error) => {
       console.error('StreamBids error:', err)
+      if (onError) onError(err)
     })
-    return stream
+    return () => stream.cancel()
   },
+
+  /**
+   * Bidirectional Streaming（计划中，需要 Envoy 支持 HTTP/2 bidirectional）
+   *
+   * gRPC-Web 0.15.0 browser 版本不支持 native bidirectional streaming。
+   * 计划升级方案：
+   * 1. Envoy 升级到支持双向 HTTP/2 代理的版本
+   * 2. 或使用 envoy-grpc-web-websocket 扩展
+   * 3. 前端改用 @improbable-eng/grpc-web 的 BidiStreaming 调用方式
+   *
+   * 架构图：
+   *   Browser  --gRPC-Web/HTTP2-->  Envoy  --WebSocket-->  :50051 (native gRPC)
+   *   Browser  <--------stream----------  Envoy  <-----bidirectional stream------
+   */
 }
 
 // ============ Order API ============

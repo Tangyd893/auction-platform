@@ -161,6 +161,8 @@ message Bid {
 message PlaceBidRequest {
   int64 item_id = 1;
   int64 amount = 2;
+  string nonce = 3;     // 防重放攻击：客户端生成的唯一ID
+  int64 timestamp = 4; // 防重放攻击：秒级时间戳
 }
 
 message PlaceBidResponse {
@@ -206,7 +208,7 @@ message BidStreamMessage {
 message BidStreamResponse {
   oneof payload {
     PlaceBidResponse bid_result = 1;
-    StreamBidsResponse bid_update = 2;
+    AuctionUpdate bid_update = 2;
     Error error = 3;
   }
 }
