@@ -1,0 +1,35 @@
+app:
+  name: "auction-platform"
+  env: "development"
+
+server:
+  grpc:
+    host: "0.0.0.0"
+    port: 50051
+  http:
+    host: "0.0.0.0"
+    port: 8080
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "postgres123"
+  dbname: "auction"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 300
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+jwt:
+  secret: "your-super-secret-key-change-in-production"
+  expiration_hours: 24
+
+logging:
+  level: "info"
+  format: "json"
