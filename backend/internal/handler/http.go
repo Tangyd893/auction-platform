@@ -151,6 +151,22 @@ func (h *Handler) ListMyItems(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "total": total})
 }
 
+func (h *Handler) PublishItem(c *gin.Context) {
+	userID := h.getUserID(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	item, err := h.itemService.Publish(c.Request.Context(), id, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
 func (h *Handler) CancelItem(c *gin.Context) {
 	userID := h.getUserID(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)

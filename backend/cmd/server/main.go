@@ -173,6 +173,7 @@ func setupHTTPRoutes(
 		api.GET("/items", h.ListItems)
 		api.GET("/items/:id", h.GetItem)
 		api.DELETE("/items/:id", h.CancelItem)
+		api.PUT("/items/:id/publish", h.PublishItem)
 
 		// 我的物品
 		api.GET("/my-items", h.ListMyItems)

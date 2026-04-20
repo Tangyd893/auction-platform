@@ -207,3 +207,29 @@ Go 后端已有完整的 Gin HTTP/REST 接口，前端直接用 `fetch` 调用�
 - `frontend/src/grpc/grpc-web-shim.js` — gRPC-Web shim（待删除）
 - `backend/internal/handler/http.go` — Gin HTTP 接口（REST 基础）
 - `proto/auction.proto` — Protobuf 定义（后端 gRPC 保留）
+
+---
+
+## 附：Django/Python gRPC 服务端时区问题调试记录（2026-04-20）
+
+### 问题现象
+API 测试（curl）出价成功，但前端创建拍品后出价失败，报 `auction has not started yet`。
+
+### 根因
+PostgreSQL 数据库字段使用 `TIMESTAMP WITHOUT TIME ZONE`，Go 读取后以**本地时区（Asia/Shanghai）** 解释存储的时间戳。但数据库中存的是 UTC 时间，导致时间比较出现偏差：
+
+- DB 存储：`start_time = 2026-04-20 06:53:25`（UTC， CST 08:53:25）
+- Go 读取：`item.StartTime = 06:53:25 +0800`（Go 误以为这是 Asia/Shanghai 时间的 06:53:25）
+- Go `time.Now() = 01:00 +0000 UTC`（约等于 09:00 +0800 CST）
+- 比较结果：`01:00 < 06:53:25` → 拍卖未开始
+
+### 调试方法
+在 `PlaceBid` 中加入日志：
+```go
+log.Printf("[BID DEBUG] now=%v item.StartTime=%v item.EndTime=%v", now, item.StartTime, item.EndTime)
+```
+
+### 解决方案
+1. **临时**：创建拍品时设置 `startTime` 为过去时间（如 `Math.floor(Date.now() / 1000) - 3600`）确保已开拍
+2. **推荐**：所有时间存储和比较统一使用 UTC，避免时区歧义
+
