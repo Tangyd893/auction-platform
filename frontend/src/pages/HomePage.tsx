@@ -65,12 +65,12 @@ export default function HomePage() {
                 className="w-full h-48 object-cover" />
               <div className="p-4">
                 <h3 className="font-semibold text-lg mb-2 truncate">{item.title}</h3>
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <div className="flex justify-between text-sm text-gray-400 mb-2">
                   <span>当前价</span><span>起拍价</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-indigo-600 font-bold">{formatPrice(item.current_price)}</span>
-                  <span className="text-gray-500">{formatPrice(item.start_price)}</span>
+                  <span className="text-gray-800 font-medium">{formatPrice(item.start_price)}</span>
                 </div>
               </div>
             </Link>

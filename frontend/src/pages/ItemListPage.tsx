@@ -67,12 +67,12 @@ export default function ItemListPage() {
                       <span className="text-indigo-600 font-bold">{formatPrice(item.current_price)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">起拍价</span>
-                      <span className="text-gray-700">{formatPrice(item.start_price)}</span>
+                      <span className="text-gray-600">起拍价</span>
+                      <span className="text-gray-900 font-medium">{formatPrice(item.start_price)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">加价幅度</span>
-                      <span className="text-gray-700">{formatPrice(item.bid_increment)}</span>
+                      <span className="text-gray-600">加价幅度</span>
+                      <span className="text-gray-900 font-medium">{formatPrice(item.bid_increment)}</span>
                     </div>
                   </div>
                 </div>

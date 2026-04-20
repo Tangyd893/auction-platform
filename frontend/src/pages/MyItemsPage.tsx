@@ -45,12 +45,12 @@ export default function MyItemsPage() {
                 <h3 className="font-semibold text-lg mb-2 truncate">{item.title}</h3>
                 <div className="space-y-1 text-sm mb-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">当前价</span>
+                    <span className="text-gray-400">当前价</span>
                     <span className="text-indigo-600 font-bold">{formatPrice(item.current_price)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">状态</span>
-                    <span className={item.status === 'listed' ? 'text-green-600' : 'text-gray-600'}>
+                    <span className="text-gray-400">状态</span>
+                    <span className={item.status === 'listed' ? 'text-green-600 font-medium' : 'text-gray-700'}>
                       {STATUS_LABELS[item.status] || item.status}
                     </span>
                   </div>
