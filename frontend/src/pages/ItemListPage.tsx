@@ -48,9 +48,9 @@ export default function ItemListPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <div className="text-center py-12 text-gray-700">加载中...</div>
       ) : items.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">暂无拍品</div>
+        <div className="text-center py-12 text-gray-700">暂无拍品</div>
       ) : (
         <>
           <div className="grid grid-cols-4 gap-6">
@@ -63,7 +63,7 @@ export default function ItemListPage() {
                   <h3 className="font-semibold text-lg mb-2 truncate">{item.title}</h3>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">当前价</span>
+                      <span className="text-gray-700">当前价</span>
                       <span className="text-indigo-600 font-bold">{formatPrice(item.current_price)}</span>
                     </div>
                     <div className="flex justify-between">

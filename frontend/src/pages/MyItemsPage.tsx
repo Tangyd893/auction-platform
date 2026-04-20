@@ -29,10 +29,10 @@ export default function MyItemsPage() {
         </Link>
       </div>
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <div className="text-center py-12 text-gray-700">加载中...</div>
       ) : items.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-          <p className="text-gray-500 mb-4">您还没有发布任何拍品</p>
+          <p className="text-gray-700 mb-4">您还没有发布任何拍品</p>
           <Link to="/create-item" className="text-indigo-600 hover:text-indigo-800">立即发布</Link>
         </div>
       ) : (

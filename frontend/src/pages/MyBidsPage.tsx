@@ -21,10 +21,10 @@ export default function MyBidsPage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">我的出价</h1>
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <div className="text-center py-12 text-gray-700">加载中...</div>
       ) : bids.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-          <p className="text-gray-500">您还没有出价记录</p>
+          <p className="text-gray-700">您还没有出价记录</p>
           <Link to="/items" className="text-indigo-600 hover:text-indigo-800 mt-4 inline-block">去竞拍</Link>
         </div>
       ) : (
@@ -32,10 +32,10 @@ export default function MyBidsPage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">拍品ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">出价金额</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">出价时间</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">拍品ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">出价金额</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">状态</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">出价时间</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -50,7 +50,7 @@ export default function MyBidsPage() {
                       {statusText[bid.status]?.text || bid.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-500">{new Date(bid.created_at).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-gray-700">{new Date(bid.created_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

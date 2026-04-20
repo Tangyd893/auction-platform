@@ -137,7 +137,7 @@ export default function ItemDetailPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-semibold mb-4">出价记录</h3>
           {bids.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">暂无出价</p>
+            <p className="text-gray-700 text-center py-4">暂无出价</p>
           ) : (
             <div className="space-y-2">
               {bids.slice(0, 5).map((bid: any, index: number) => (

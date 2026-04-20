@@ -31,22 +31,22 @@ export default function OrdersPage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">我的订单</h1>
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <div className="text-center py-12 text-gray-700">加载中...</div>
       ) : orders.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-          <p className="text-gray-500">暂无订单</p>
+          <p className="text-gray-700">暂无订单</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">订单ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">拍品ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">成交价</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">创建时间</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">订单ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">拍品ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">成交价</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">状态</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">创建时间</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -60,7 +60,7 @@ export default function OrdersPage() {
                       {STATUS_LABELS[order.status]?.text || order.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-500">{new Date(order.created_at).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-gray-700">{new Date(order.created_at).toLocaleString()}</td>
                   <td className="px-6 py-4">
                     {order.status === 'pending' && user?.role === 'buyer' && (
                       <button onClick={() => updateStatusMutation.mutate({ id: order.id, status: 'paid' })}
