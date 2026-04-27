@@ -169,25 +169,30 @@ func setupHTTPRoutes(
 		api.POST("/auth/login", h.Login)
 
 		// 拍品
-		api.POST("/items", h.CreateItem)
 		api.GET("/items", h.ListItems)
 		api.GET("/items/:id", h.GetItem)
-		api.DELETE("/items/:id", h.CancelItem)
-		api.PUT("/items/:id/publish", h.PublishItem)
-
-		// 我的物品
-		api.GET("/my-items", h.ListMyItems)
-
-		// 出价
-		api.POST("/bids", h.PlaceBid)
 		api.GET("/items/:id/bids", h.GetBids)
-		api.GET("/my-bids", h.GetMyBids)
 
-		// 订单
-		api.POST("/orders", h.CreateOrder)
-		api.GET("/orders", h.ListOrders)
-		api.GET("/orders/:id", h.GetOrder)
-		api.PUT("/orders/:id/status", h.UpdateOrderStatus)
+		protected := api.Group("")
+		protected.Use(h.AuthRequired())
+		{
+			protected.POST("/items", h.CreateItem)
+			protected.DELETE("/items/:id", h.CancelItem)
+			protected.PUT("/items/:id/publish", h.PublishItem)
+
+			// 我的物品
+			protected.GET("/my-items", h.ListMyItems)
+
+			// 出价
+			protected.POST("/bids", h.PlaceBid)
+			protected.GET("/my-bids", h.GetMyBids)
+
+			// 订单
+			protected.POST("/orders", h.CreateOrder)
+			protected.GET("/orders", h.ListOrders)
+			protected.GET("/orders/:id", h.GetOrder)
+			protected.PUT("/orders/:id/status", h.UpdateOrderStatus)
+		}
 	}
 
 	return router

@@ -24,7 +24,7 @@ backend-run:
 	cd backend && go run cmd/server/main.go
 
 seed:
-	cd backend && go run cmd/server/seed.go
+	cd backend && go run cmd/seed/main.go
 
 # 前端
 frontend-deps:

@@ -13,8 +13,8 @@ import (
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserExists       = errors.New("user already exists")
-	ErrInvalidToken     = errors.New("invalid token")
+	ErrUserExists         = errors.New("user already exists")
+	ErrInvalidToken       = errors.New("invalid token")
 )
 
 type AuthService struct {
@@ -107,6 +107,9 @@ func (s *AuthService) generateToken(user *model.User) (string, error) {
 
 func (s *AuthService) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
 		return []byte(s.jwtCfg.Secret), nil
 	})
 

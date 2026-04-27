@@ -7,9 +7,29 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// 请求拦截器：注入 token
-api.interceptors.request.use((config) => {
+type PersistedAuthState = {
+  state?: {
+    token?: string | null
+  }
+}
+
+function getStoredToken() {
   const token = localStorage.getItem('token')
+  if (token) return token
+
+  const persisted = localStorage.getItem('auth-storage')
+  if (!persisted) return null
+
+  try {
+    const parsed = JSON.parse(persisted) as PersistedAuthState
+    return parsed.state?.token ?? null
+  } catch {
+    return null
+  }
+}
+
+api.interceptors.request.use((config) => {
+  const token = getStoredToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -87,7 +107,7 @@ export const itemApi = {
     api.get<{ items: Item[]; total: number }>('/items', { params }),
 
   get: (id: number) =>
-    api.get<{ item: Item }>(`/items/${id}`).then((r) => r.data.item),
+    api.get<Item>(`/items/${id}`).then((r) => r.data),
 
   create: (data: {
     title: string
@@ -130,13 +150,13 @@ export const orderApi = {
     api.post<Order>('/orders', { itemId }),
 
   get: (id: number) =>
-    api.get<{ order: Order }>(`/orders/${id}`).then((r) => r.data.order),
+    api.get<Order>(`/orders/${id}`).then((r) => r.data),
 
   list: (params?: { page?: number; pageSize?: number }) =>
     api.get<{ orders: Order[]; total: number }>('/orders', { params }),
 
   updateStatus: (id: number, status: string) =>
-    api.put<{ order: Order }>(`/orders/${id}/status`, { status }),
+    api.put<Order>(`/orders/${id}/status`, { status }),
 }
 
 // ============ User API ============

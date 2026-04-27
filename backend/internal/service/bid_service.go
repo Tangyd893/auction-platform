@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	ErrBidTooLow      = errors.New("bid amount is too low")
-	ErrAuctionEnded    = errors.New("auction has ended")
-	ErrCannotBidOwn   = errors.New("cannot bid on your own item")
-	ErrItemNotActive  = errors.New("item is not available for bidding")
+	ErrBidTooLow     = errors.New("bid amount is too low")
+	ErrAuctionEnded  = errors.New("auction has ended")
+	ErrCannotBidOwn  = errors.New("cannot bid on your own item")
+	ErrItemNotActive = errors.New("item is not available for bidding")
 )
 
 type BidService struct {
@@ -69,12 +69,13 @@ func (s *BidService) PlaceBid(ctx context.Context, itemID, buyerID, amount int64
 		return nil, 0, false, err
 	}
 
-	// 将之前的领先出价标记为 outbid
-	highestBid, err := s.bidRepo.GetHighestBid(itemID)
-	if err == nil && highestBid != nil && highestBid.ID != bid.ID {
-		s.bidRepo.UpdateStatus(highestBid.ID, string(model.BidStatusOutbid))
+	if err := s.bidRepo.MarkItemBidsOutbid(itemID, bid.ID); err != nil {
+		return nil, 0, false, err
 	}
 	bid.Status = string(model.BidStatusWinning)
+	if err := s.bidRepo.UpdateStatus(bid.ID, bid.Status); err != nil {
+		return nil, 0, false, err
+	}
 
 	return bid, amount, true, nil
 }

@@ -12,7 +12,6 @@ import (
 type BidRepo interface {
 	Create(bid *model.Bid) error
 	GetByID(id int64) (*model.Bid, error)
-	GetHighestBid(itemID int64) (*model.Bid, error)
 	ListByItemID(itemID int64) ([]*model.Bid, error)
 	ListByBuyerID(buyerID int64) ([]*model.Bid, error)
 	CountByItemID(itemID int64) (int64, error)

@@ -30,14 +30,6 @@ func (m *MockBidRepository) GetByID(id int64) (*model.Bid, error) {
 	return args.Get(0).(*model.Bid), args.Error(1)
 }
 
-func (m *MockBidRepository) GetHighestBid(itemID int64) (*model.Bid, error) {
-	args := m.Called(itemID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*model.Bid), args.Error(1)
-}
-
 func (m *MockBidRepository) ListByItemID(itemID int64) ([]*model.Bid, error) {
 	args := m.Called(itemID)
 	if args.Get(0) == nil {
@@ -160,22 +152,14 @@ func TestPlaceBid_Success(t *testing.T) {
 		EndTime:      now.Add(1 * time.Hour),
 	}
 
-	prevBid := &model.Bid{
-		ID:      2, // 不同的 ID
-		ItemID:  1,
-		BuyerID: 30,
-		Amount:  10000,
-		Status:  string(model.BidStatusActive),
-	}
-
 	mockItemRepo.On("GetByID", int64(1)).Return(item, nil)
 	mockBidRepo.On("Create", mock.AnythingOfType("*model.Bid")).Return(nil).Run(func(args mock.Arguments) {
 		b := args.Get(0).(*model.Bid)
 		b.ID = 1
 	})
 	mockItemRepo.On("UpdatePrice", int64(1), int64(10100)).Return(nil)
-	mockBidRepo.On("GetHighestBid", int64(1)).Return(prevBid, nil)
-	mockBidRepo.On("UpdateStatus", int64(2), string(model.BidStatusOutbid)).Return(nil)
+	mockBidRepo.On("MarkItemBidsOutbid", int64(1), int64(1)).Return(nil)
+	mockBidRepo.On("UpdateStatus", int64(1), string(model.BidStatusWinning)).Return(nil)
 
 	ctx := context.Background()
 	resultBid, currentPrice, isWinning, err := svc.PlaceBid(ctx, 1, 20, 10100)
@@ -318,8 +302,8 @@ func TestCreateItem_EndTimeInPast(t *testing.T) {
 	req := &CreateItemRequest{
 		Title:      "Test",
 		StartPrice: 10000,
-		StartTime:  time.Now().Add(-1*time.Hour).Unix(),
-		EndTime:    time.Now().Add(-30*time.Minute).Unix(), // 结束时间在过去
+		StartTime:  time.Now().Add(-1 * time.Hour).Unix(),
+		EndTime:    time.Now().Add(-30 * time.Minute).Unix(), // 结束时间在过去
 	}
 
 	ctx := context.Background()
@@ -338,7 +322,7 @@ func TestCreateItem_StartAfterEnd(t *testing.T) {
 	req := &CreateItemRequest{
 		Title:      "Test",
 		StartPrice: 10000,
-		StartTime:  time.Now().Add(2*time.Hour).Unix(),
+		StartTime:  time.Now().Add(2 * time.Hour).Unix(),
 		EndTime:    time.Now().Add(1 * time.Hour).Unix(), // 开始在结束之后
 	}
 
@@ -381,9 +365,6 @@ func (a *BidRepositoryAdapter) Create(bid *model.Bid) error {
 }
 func (a *BidRepositoryAdapter) GetByID(id int64) (*model.Bid, error) {
 	return a.mock.GetByID(id)
-}
-func (a *BidRepositoryAdapter) GetHighestBid(itemID int64) (*model.Bid, error) {
-	return a.mock.GetHighestBid(itemID)
 }
 func (a *BidRepositoryAdapter) ListByItemID(itemID int64) ([]*model.Bid, error) {
 	return a.mock.ListByItemID(itemID)

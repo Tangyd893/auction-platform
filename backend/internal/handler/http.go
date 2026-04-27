@@ -6,9 +6,13 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"auction-platform/internal/service"
+)
+
+const (
+	userIDContextKey   = "userID"
+	userRoleContextKey = "userRole"
 )
 
 type Handler struct {
@@ -188,8 +192,8 @@ func (h *Handler) CancelItem(c *gin.Context) {
 func (h *Handler) PlaceBid(c *gin.Context) {
 	userID := h.getUserID(c)
 	var req struct {
-		ItemId int64  `json:"itemId" binding:"required"`
-		Amount int64  `json:"amount" binding:"required"`
+		ItemId int64 `json:"itemId" binding:"required"`
+		Amount int64 `json:"amount" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -303,25 +307,32 @@ func (h *Handler) UpdateOrderStatus(c *gin.Context) {
 
 // ============ Helper ============
 
+func (h *Handler) AuthRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		parts := strings.Fields(authHeader)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization header"})
+			return
+		}
+
+		claims, err := h.authService.ValidateToken(parts[1])
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			return
+		}
+
+		c.Set(userIDContextKey, claims.UserID)
+		c.Set(userRoleContextKey, claims.Role)
+		c.Next()
+	}
+}
+
 func (h *Handler) getUserID(c *gin.Context) int64 {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		return 1 // 测试用，未登录默认用户1
-	}
-
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// 解析 JWT（不验证签名，仅提取 userID）
-	// 生产环境应验证签名
-	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
-	if err != nil {
-		return 1
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		if userID, ok := claims["user_id"].(float64); ok {
-			return int64(userID)
+	if userID, ok := c.Get(userIDContextKey); ok {
+		if id, ok := userID.(int64); ok {
+			return id
 		}
 	}
-	return 1
+	return 0
 }

@@ -8,14 +8,14 @@ Go + gRPC 实战项目：完整的 Clean Architecture 分层、gRPC 四种 RPC �
 
 | 层级 | 技术 |
 |------|------|
-| 语言 | Go 1.21 + grpc-go v1.62 |
+| 语言 | Go 1.25 + grpc-go v1.62 |
 | HTTP | Gin v1.9.1 |
-| 数据库 | PostgreSQL 16 |
+| 数据库 | PostgreSQL 15 |
 | 缓存 | Redis 7 |
 | 前端 | React 18 + Vite |
-| 代理 | Envoy 3（gRPC-Web 场景）|
+| 代理 | Envoy 3（历史 gRPC-Web 场景，可选）|
 | 监控 | Prometheus |
-| ORM | GORM v2 |
+| 数据访问 | database/sql + lib/pq |
 
 ## 架构
 
@@ -58,11 +58,12 @@ cd frontend && npm run dev
 | POST | /api/items | 创建拍品 | JWT |
 | GET | /api/items | 列出拍品（?status=&keyword=）| — |
 | GET | /api/items/:id | 拍品详情 | — |
-| GET | /api/items/my | 我的拍品 | JWT |
+| PUT | /api/items/:id/publish | 发布拍品 | JWT |
 | DELETE | /api/items/:id | 取消拍品 | JWT |
-| POST | /api/bids | 出价（?itemId=&amount=）| JWT |
-| GET | /api/bids/:itemId | 拍品出价记录 | — |
-| GET | /api/bids/my | 我的出价 | JWT |
+| GET | /api/my-items | 我的拍品 | JWT |
+| POST | /api/bids | 出价（JSON: itemId, amount）| JWT |
+| GET | /api/items/:id/bids | 拍品出价记录 | — |
+| GET | /api/my-bids | 我的出价 | JWT |
 | POST | /api/orders | 创建订单 | JWT |
 | GET | /api/orders | 我的订单列表 | JWT |
 | GET | /api/orders/:id | 订单详情 | JWT |
@@ -90,8 +91,7 @@ auction-platform/
 │       └── service/                  ← 业务逻辑 + 单元测试
 ├── frontend/
 │   └── src/
-│       ├── api/                      ← REST API 客户端（TODO: 重写）
-│       ├── grpc/                     ← gRPC-Web 代码（待删除）
+│       ├── api/                      ← REST API 客户端
 │       └── pages/                    ← React 页面组件
 └── docker/
     └── docker-compose.yml

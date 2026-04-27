@@ -29,16 +29,6 @@ func (r *BidRepository) GetByID(id int64) (*model.Bid, error) {
 	return bid, nil
 }
 
-func (r *BidRepository) GetHighestBid(itemID int64) (*model.Bid, error) {
-	query := `SELECT id, item_id, buyer_id, amount, status, created_at FROM bids WHERE item_id = $1 ORDER BY amount DESC LIMIT 1`
-	bid := &model.Bid{}
-	err := r.db.QueryRow(query, itemID).Scan(&bid.ID, &bid.ItemID, &bid.BuyerID, &bid.Amount, &bid.Status, &bid.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return bid, nil
-}
-
 func (r *BidRepository) ListByItemID(itemID int64) ([]*model.Bid, error) {
 	query := `SELECT id, item_id, buyer_id, amount, status, created_at FROM bids WHERE item_id = $1 ORDER BY amount DESC`
 	rows, err := r.db.Query(query, itemID)
@@ -89,7 +79,7 @@ func (r *BidRepository) UpdateStatus(id int64, status string) error {
 }
 
 func (r *BidRepository) MarkItemBidsOutbid(itemID int64, exceptBidID int64) error {
-	query := `UPDATE bids SET status = 'outbid' WHERE item_id = $1 AND id != $2 AND status = 'active'`
+	query := `UPDATE bids SET status = 'outbid' WHERE item_id = $1 AND id != $2 AND status IN ('active', 'winning')`
 	_, err := r.db.Exec(query, itemID, exceptBidID)
 	return err
 }
